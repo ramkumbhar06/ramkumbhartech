@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ram Kumbhar — Sheets &amp; Apps Script Automation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0b0f0d; --ink-soft:#121814; --ink-softer:#182019;
+    --paper:#f3f5ef; --paper-dim:#c9cfc6;
+    --line:rgba(255,255,255,0.09); --line-strong:rgba(255,255,255,0.16);
+    --green:#29c17e; --green-dim:#1c7a52; --green-glow:rgba(41,193,126,0.35);
+    --amber:#f0a93e; --select:#4c8dff; --muted:#8a9290; --danger:#e2574c;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;} }
+  body{margin:0; background:var(--ink); color:var(--paper); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden;}
+  ::selection{background:var(--green); color:var(--ink);}
+  .display{font-family:'Space Grotesk',sans-serif;} .mono{font-family:'JetBrains Mono',monospace;}
+
+  .grid-bg{position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:64px 40px; opacity:0.5;
+    mask-image:radial-gradient(ellipse 90% 70% at 50% 0%, black 40%, transparent 90%);}
+
+  #cellCursor{position:fixed; z-index:9999; pointer-events:none; border:2px solid var(--select);
+    box-shadow:0 0 0 1px rgba(76,141,255,0.25), 0 0 18px rgba(76,141,255,0.35);
+    transition:transform .12s ease, opacity .15s ease, width .15s ease, height .15s ease; opacity:0;}
+  #cellCursor::after{content:attr(data-ref); position:absolute; top:-22px; left:-2px; font-family:'JetBrains Mono',monospace;
+    font-size:11px; font-weight:600; background:var(--select); color:#fff; padding:2px 6px; border-radius:2px; white-space:nowrap;}
+  @media (hover:none){ #cellCursor{display:none;} }
+
+  .topbar{position:fixed; top:0; left:0; right:0; z-index:100; display:flex; align-items:center; justify-content:space-between;
+    padding:14px 28px; background:rgba(11,15,13,0.82); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-badge{width:28px; height:28px; border-radius:5px; background:linear-gradient(135deg, var(--green), var(--green-dim));
+    display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; color:#04140c;}
+  .brand-name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; letter-spacing:.2px;}
+  .brand-name span{color:var(--muted); font-weight:400;}
+  .topbar-status{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .dot{width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green-glow); animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .hero{position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:120px 6vw 60px;}
+  .sheet-frame{border:1px solid var(--line-strong); background:var(--ink-soft); border-radius:6px; overflow:hidden; box-shadow:0 40px 90px -30px rgba(0,0,0,0.7);}
+  .sheet-toprow{display:flex; align-items:center; border-bottom:1px solid var(--line-strong); background:var(--ink-softer);}
+  .name-box{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); padding:9px 16px; border-right:1px solid var(--line-strong); min-width:110px;}
+  .formula-bar{flex:1; padding:9px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--green); white-space:nowrap; overflow:hidden;}
+  .formula-bar .fx{color:var(--muted); margin-right:10px;}
+  .caret{display:inline-block; width:7px; height:15px; background:var(--green); vertical-align:middle; margin-left:2px; animation:blink 1s step-end infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  .col-headers{display:flex; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted);}
+  .col-headers div{padding:5px 0; text-align:center; border-right:1px solid var(--line); flex-shrink:0;}
+  .colA{width:44px;} .colB{flex:1;}
+  .hero-row{display:flex;}
+  .row-num{width:44px; flex-shrink:0; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); display:flex; align-items:flex-start; justify-content:center; padding-top:26px; border-right:1px solid var(--line);}
+  .hero-cell{flex:1; padding:40px 44px 46px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--amber); letter-spacing:.06em; margin-bottom:18px; display:flex; align-items:center; gap:8px;}
+  .eyebrow::before{content:"ƒ"; font-style:italic; color:var(--amber); font-size:15px;}
+  h1.hero-title{font-size:clamp(2.4rem, 6.2vw, 5.2rem); line-height:1.02; margin:0 0 22px; font-weight:600; letter-spacing:-0.02em;}
+  h1.hero-title .accent{color:var(--green);}
+  .hero-sub{font-size:clamp(1rem, 1.6vw, 1.25rem); color:var(--paper-dim); max-width:640px; line-height:1.55; margin:0 0 34px;}
+  .hero-actions{display:flex; flex-wrap:wrap; gap:12px;}
+  .btn{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500; padding:12px 20px; border-radius:3px; border:1px solid var(--line-strong);
+    background:transparent; color:var(--paper); cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:8px; transition:all .18s ease;}
+  .btn-primary{background:var(--green); border-color:var(--green); color:#04140c; font-weight:600;}
+  .btn-primary:hover{background:#3ddb93; transform:translateY(-2px); box-shadow:0 10px 24px -8px var(--green-glow);}
+  .btn:not(.btn-primary):hover{border-color:var(--green); color:var(--green); transform:translateY(-2px);}
+  .btn-linkedin{border-color:#0A66C2; color:#cfe4fb;}
+  .btn-linkedin .li-mark{width:18px; height:18px; border-radius:3px; background:#0A66C2; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+  .btn-linkedin:hover{border-color:#3d92e0; color:#fff; background:rgba(10,102,194,0.12);}
+  .hero-stats{display:flex; gap:0; margin-top:44px; border-top:1px solid var(--line); flex-wrap:wrap;}
+  .stat{padding:16px 30px 4px 0; margin-right:30px;}
+  .stat-num{font-family:'Space Grotesk',sans-serif; font-size:1.7rem; font-weight:700; color:var(--green);}
+  .stat-label{font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); margin-top:2px;}
+
+  section{position:relative; z-index:1; padding:110px 6vw; border-top:1px solid var(--line);}
+  .section-head{display:flex; align-items:baseline; gap:16px; margin-bottom:52px; flex-wrap:wrap;}
+  .section-tag{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--green); background:rgba(41,193,126,0.1); border:1px solid var(--green-dim); padding:4px 10px; border-radius:3px;}
+  .section-title{font-family:'Space Grotesk',sans-serif; font-size:clamp(1.7rem,3.4vw,2.6rem); font-weight:600; margin:0; letter-spacing:-0.01em;}
+  .section-intro{color:var(--muted); max-width:640px; margin:0 0 52px; font-size:1rem; line-height:1.6;}
+  .reveal{opacity:0; transform:translateY(22px); transition:opacity .6s ease, transform .6s ease;}
+  .reveal.in{opacity:1; transform:translateY(0);}
+
+  .cell{position:relative; background:var(--ink-soft); border:1px solid var(--line); border-radius:3px; padding:22px; transition:border-color .2s ease, transform .2s ease;}
+  .cell:hover{border-color:var(--line-strong); transform:translateY(-3px);}
+  .cell-ref{position:absolute; top:8px; right:10px; font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted); opacity:0.6;}
+
+  .about-grid{display:grid; grid-template-columns:1.1fr 0.9fr; gap:48px; align-items:start;}
+  .about-copy p{color:var(--paper-dim); line-height:1.75; font-size:1.02rem; margin:0 0 18px;}
+  .about-copy strong{color:var(--paper); font-weight:600;}
+  .range-box{border:1px solid var(--line); border-radius:4px; overflow:hidden;}
+  .range-head{background:var(--ink-softer); padding:10px 16px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--amber); border-bottom:1px solid var(--line);}
+  .range-item{display:flex; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line); font-size:13.5px;}
+  .range-item:last-child{border-bottom:none;}
+  .range-item span:first-child{color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11.5px;}
+  .range-item span:last-child{color:var(--paper); font-weight:500;}
+
+  /* Experience — grouped by company */
+  .company-block{border-top:1px solid var(--line-strong); padding-top:28px; margin-bottom:10px;}
+  .company-head{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px;}
+  .company-name{font-family:'Space Grotesk',sans-serif; font-size:1.5rem; font-weight:700;}
+  .company-tenure{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--green); background:rgba(41,193,126,0.08); border:1px solid var(--green-dim); padding:5px 12px; border-radius:20px;}
+  .company-meta{color:var(--muted); font-size:13px; margin-bottom:22px;}
+  .role-row{display:grid; grid-template-columns:170px 1fr; gap:28px; padding:24px 0 24px 22px; border-left:2px solid var(--line); margin-left:6px; position:relative;}
+  .role-row::before{content:""; position:absolute; left:-6px; top:30px; width:10px; height:10px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px var(--ink);}
+  .role-period{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); padding-top:2px;}
+  .role-period .dur{display:block; color:var(--green); margin-top:4px; font-size:11px;}
+  .role-title{font-family:'Space Grotesk',sans-serif; font-size:1.2rem; font-weight:600; margin:0 0 3px;}
+  .role-loc{color:var(--muted); font-size:13px; margin-bottom:14px;}
+  .exp-list{margin:0; padding:0; list-style:none;}
+  .exp-list li{position:relative; padding-left:22px; margin-bottom:11px; color:var(--paper-dim); font-size:14.5px; line-height:1.6;}
+  .exp-list li::before{content:"▸"; position:absolute; left:0; color:var(--green);}
+
+  /* Skills */
+  .skills-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:12px;}
+  .skill-cell{padding:20px 18px; display:flex; align-items:flex-start; gap:14px;}
+  .skill-logo{width:34px; height:34px; border-radius:7px; flex-shrink:0; background:#fff; padding:5px; display:flex; align-items:center; justify-content:center;}
+  .skill-logo svg{width:100%; height:100%;}
+  .skill-logo.glyph{background:var(--ink-softer); font-size:17px; padding:0; border:1px solid var(--line-strong);}
+  .skill-body{flex:1; min-width:0;}
+  .skill-fn{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--amber); margin-bottom:4px;}
+  .skill-name{font-weight:600; font-size:14.5px; line-height:1.3;}
+  .skill-bar{height:3px; background:var(--line); border-radius:2px; margin-top:12px; overflow:hidden;}
+  .skill-bar i{display:block; height:100%; background:linear-gradient(90deg,var(--green-dim),var(--green)); border-radius:2px; width:0%; transition:width 1.1s cubic-bezier(.2,.8,.2,1);}
+
+  .cert-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:16px;}
+  .cert-cell{padding:24px;}
+  .cert-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;}
+  .cert-issuer{font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted);}
+  .cert-icon{width:30px; height:30px; border-radius:5px; background:var(--ink-softer); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; font-size:14px;}
+  .cert-name{font-weight:600; font-size:15.5px; margin-bottom:8px; line-height:1.35;}
+  .cert-meta{font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); margin-bottom:14px;}
+  .cert-link{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--green); text-decoration:none; border-bottom:1px dashed var(--green-dim);}
+  .cert-more{display:flex; align-items:center; justify-content:center; text-align:center; border-style:dashed;}
+
+  /* Education */
+  .edu-card{border:1px solid var(--line-strong); border-radius:5px; padding:32px; background:var(--ink-soft); position:relative; overflow:hidden;}
+  .edu-card::before{content:""; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--green),var(--select));}
+  .edu-years{font-family:'JetBrains Mono',monospace; color:var(--muted); font-size:1.1rem; margin-bottom:10px; letter-spacing:.02em;}
+  .edu-degree{font-family:'Space Grotesk',sans-serif; font-size:1.6rem; font-weight:700; margin:0 0 8px;}
+  .edu-school{color:var(--paper-dim); font-size:14px; margin-bottom:4px;}
+  .edu-uni{color:var(--muted); font-size:12.5px; font-family:'JetBrains Mono',monospace; margin-bottom:20px;}
+  .edu-badges{display:flex; gap:10px; flex-wrap:wrap;}
+  .edu-badge{font-family:'JetBrains Mono',monospace; font-size:12px; border:1px solid var(--green-dim); background:rgba(41,193,126,0.08); color:var(--green); padding:7px 14px; border-radius:20px;}
+  .edu-badge.alt{border-color:var(--line-strong); background:transparent; color:var(--paper-dim);}
+
+  /* Awards */
+  .awards-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:14px;}
+  .award-cell{display:flex; align-items:center; gap:16px; padding:20px;}
+  .award-star{width:42px; height:42px; border-radius:6px; background:rgba(240,169,62,0.1); border:1px solid var(--amber); color:var(--amber); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;}
+  .award-name{font-weight:600; font-size:14.5px; line-height:1.35;}
+  .award-note{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-top:3px;}
+
+  .proj-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:18px;}
+
+
+  .proj-cell{padding:26px; display:flex; flex-direction:column; min-height:210px;}
+  .proj-tag{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--select); background:rgba(76,141,255,0.1); border:1px solid rgba(76,141,255,0.35); padding:3px 8px; border-radius:3px; align-self:flex-start; margin-bottom:16px;}
+  .proj-title{font-family:'Space Grotesk',sans-serif; font-size:1.2rem; font-weight:600; margin:0 0 10px;}
+  .proj-desc{color:var(--paper-dim); font-size:13.8px; line-height:1.6; flex:1;}
+  .proj-cell.empty{border-style:dashed; align-items:center; justify-content:center; text-align:center; color:var(--muted);}
+  .proj-cell.empty .plus{font-size:26px; color:var(--muted); margin-bottom:8px; font-family:'JetBrains Mono',monospace;}
+
+  .roi-shell{border:1px solid var(--line-strong); border-radius:6px; overflow:hidden; background:var(--ink-soft); box-shadow:0 30px 70px -30px rgba(0,0,0,0.6);}
+  .roi-bar{display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--ink-softer); border-bottom:1px solid var(--line-strong); font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted);}
+  .roi-bar .dot3{width:8px; height:8px; border-radius:50%;}
+  .roi-body{display:grid; grid-template-columns:1fr 1fr;}
+  .roi-inputs{padding:36px 40px; border-right:1px solid var(--line);}
+  .roi-field{margin-bottom:26px;}
+  .roi-field label{display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted); margin-bottom:10px;}
+  .roi-field label b{color:var(--amber); font-weight:600;}
+  input[type=range]{-webkit-appearance:none; width:100%; height:4px; background:var(--line-strong); border-radius:2px; outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--green); cursor:pointer; box-shadow:0 0 0 4px rgba(41,193,126,0.2);}
+  input[type=range]::-moz-range-thumb{width:16px; height:16px; border-radius:50%; background:var(--green); border:none; cursor:pointer; box-shadow:0 0 0 4px rgba(41,193,126,0.2);}
+  .roi-outputs{padding:36px 40px; display:flex; flex-direction:column; justify-content:center; gap:22px;}
+  .roi-out-row{display:flex; justify-content:space-between; align-items:center; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--line);}
+  .roi-out-row:last-child{border-bottom:none; padding-bottom:0;}
+  .roi-out-label{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); margin-bottom:5px;}
+  .roi-out-val{font-family:'Space Grotesk',sans-serif; font-size:1.9rem; font-weight:700; color:var(--green);}
+  .roi-out-val.big{font-size:2.6rem;}
+  .roi-formula{font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted);}
+  @media (max-width:760px){ .roi-body{grid-template-columns:1fr;} .roi-inputs{border-right:none; border-bottom:1px solid var(--line);} }
+
+  .contact-wrap{display:flex; flex-direction:column; align-items:flex-start; gap:34px;}
+  .contact-title{font-size:clamp(1.9rem,4.4vw,3.4rem); font-family:'Space Grotesk',sans-serif; font-weight:600; letter-spacing:-0.02em; max-width:780px; line-height:1.12;}
+  .contact-title .accent{color:var(--green);}
+  .contact-links{display:flex; flex-wrap:wrap; gap:14px;}
+  .clink{display:flex; align-items:center; gap:10px; padding:14px 20px; border:1px solid var(--line-strong); border-radius:3px; color:var(--paper); text-decoration:none; font-family:'JetBrains Mono',monospace; font-size:13px; transition:all .18s ease;}
+  .clink:hover{border-color:var(--green); color:var(--green); transform:translateY(-2px);}
+  .clink .ic{color:var(--amber);}
+
+  footer{position:relative; z-index:1; padding:22px 6vw 90px; border-top:1px solid var(--line); display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);}
+
+  .tabnav{position:fixed; bottom:0; left:0; right:0; z-index:90; display:flex; overflow-x:auto; background:var(--ink-softer); border-top:1px solid var(--line-strong); -ms-overflow-style:none; scrollbar-width:none;}
+  .tabnav::-webkit-scrollbar{display:none;}
+  .tabnav a{flex-shrink:0; padding:11px 18px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted); text-decoration:none; border-right:1px solid var(--line); display:flex; align-items:center; gap:7px; transition:color .15s, background .15s;}
+  .tabnav a .swatch{width:7px; height:7px; border-radius:1px; background:var(--muted);}
+  .tabnav a:hover{color:var(--paper); background:rgba(255,255,255,0.03);}
+  .tabnav a.active{color:var(--green); background:var(--ink); border-top:2px solid var(--green); margin-top:-1px;}
+  .tabnav a.active .swatch{background:var(--green);}
+
+  /* ---------------- Admin: "Script Editor" panel ---------------- */
+  #adminFab{position:fixed; right:20px; bottom:64px; z-index:200; width:52px; height:52px; border-radius:50%;
+    background:var(--amber); color:#241704; border:none; cursor:pointer; font-family:'JetBrains Mono',monospace; font-weight:700;
+    font-size:16px; box-shadow:0 10px 26px -8px rgba(240,169,62,0.6); transition:transform .15s ease;}
+  #adminFab:hover{transform:scale(1.08) rotate(-6deg);}
+
+  .admin-overlay{position:fixed; inset:0; z-index:500; background:rgba(4,6,5,0.75); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; padding:20px;}
+  .admin-overlay.open{display:flex;}
+  .passcode-box{background:var(--ink-soft); border:1px solid var(--line-strong); border-radius:6px; padding:30px; width:100%; max-width:340px; text-align:center;}
+  .passcode-box h3{font-family:'Space Grotesk',sans-serif; margin:0 0 8px;}
+  .passcode-box p{color:var(--muted); font-size:12.5px; margin:0 0 18px; line-height:1.5;}
+  .passcode-box input{width:100%; padding:11px 14px; background:var(--ink); border:1px solid var(--line-strong); color:var(--paper); border-radius:4px; font-family:'JetBrains Mono',monospace; margin-bottom:12px; font-size:14px;}
+  .passcode-err{color:var(--danger); font-size:11.5px; margin:-6px 0 12px; display:none;}
+
+  .admin-panel{position:fixed; inset:0; z-index:400; background:var(--ink); display:none; flex-direction:column;}
+  .admin-panel.open{display:flex;}
+  .admin-topbar{display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--line-strong); background:var(--ink-softer); flex-wrap:wrap; gap:10px;}
+  .admin-topbar-left{display:flex; align-items:center; gap:10px; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted);}
+  .admin-topbar-left b{color:var(--amber);}
+  .admin-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .admin-btn{font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:8px 14px; border-radius:3px; border:1px solid var(--line-strong); background:transparent; color:var(--paper); cursor:pointer;}
+  .admin-btn:hover{border-color:var(--green); color:var(--green);}
+  .admin-btn.danger:hover{border-color:var(--danger); color:var(--danger);}
+  .admin-btn.primary{background:var(--green); border-color:var(--green); color:#04140c; font-weight:600;}
+
+  .admin-body{flex:1; display:flex; overflow:hidden;}
+  .admin-tabs{width:190px; flex-shrink:0; border-right:1px solid var(--line-strong); background:var(--ink-soft); overflow-y:auto;}
+  .admin-tab{display:flex; align-items:center; gap:8px; padding:14px 18px; font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--muted); cursor:pointer; border-left:2px solid transparent; border-bottom:1px solid var(--line);}
+  .admin-tab:hover{color:var(--paper); background:rgba(255,255,255,0.02);}
+  .admin-tab.active{color:var(--green); border-left-color:var(--green); background:var(--ink);}
+  .admin-content{flex:1; overflow-y:auto; padding:26px 32px;}
+  .admin-list-item{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:16px; border:1px solid var(--line); border-radius:4px; margin-bottom:10px; background:var(--ink-soft);}
+  .admin-list-item .info b{display:block; font-size:14.5px; margin-bottom:4px;}
+  .admin-list-item .info span{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted);}
+  .admin-item-actions{display:flex; gap:6px; flex-shrink:0;}
+  .icon-btn{width:30px; height:30px; border-radius:4px; border:1px solid var(--line-strong); background:transparent; color:var(--muted); cursor:pointer; font-size:13px;}
+  .icon-btn:hover{color:var(--green); border-color:var(--green);}
+  .icon-btn.del:hover{color:var(--danger); border-color:var(--danger);}
+  .add-new-btn{width:100%; padding:14px; border:1px dashed var(--line-strong); border-radius:4px; background:transparent; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:12.5px; cursor:pointer; margin-top:6px;}
+  .add-new-btn:hover{border-color:var(--green); color:var(--green);}
+
+  .admin-form{background:var(--ink-soft); border:1px solid var(--line-strong); border-radius:5px; padding:22px; margin-bottom:18px;}
+  .form-row{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;}
+  .form-row.single{grid-template-columns:1fr;}
+  .form-field label{display:block; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:6px;}
+  .form-field input, .form-field select, .form-field textarea{width:100%; padding:9px 12px; background:var(--ink); border:1px solid var(--line-strong); color:var(--paper); border-radius:4px; font-family:'Inter',sans-serif; font-size:13px;}
+  .form-field textarea{resize:vertical; min-height:70px; font-family:'JetBrains Mono',monospace; font-size:12.5px;}
+  .form-hint{font-size:10.5px; color:var(--muted); margin-top:4px;}
+  .form-buttons{display:flex; gap:10px; margin-top:6px;}
+  @media (max-width:700px){ .admin-body{flex-direction:column;} .admin-tabs{width:100%; display:flex; overflow-x:auto;} .admin-tab{border-left:none; border-bottom:2px solid transparent; white-space:nowrap;} .admin-tab.active{border-bottom-color:var(--green);} .form-row{grid-template-columns:1fr;} }
+
+  @media (max-width:900px){
+    .about-grid{grid-template-columns:1fr;}
+    .sheet-toprow{flex-wrap:wrap;}
+    .hero-row{flex-direction:column;}
+    .row-num{display:none;}
+    .hero-cell{padding:30px 22px 38px;}
+    section{padding:80px 5vw;}
+    .role-row{grid-template-columns:1fr; gap:8px;}
+  }
+  @media (max-width:520px){
+    .topbar{padding:12px 16px;} .brand-name{font-size:13px;}
+    .hero-stats{gap:0;} .stat{margin-right:20px; padding-right:0;}
+    #adminFab{right:14px; bottom:60px; width:46px; height:46px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div id="cellCursor" data-ref=""></div>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-badge mono">fx</div>
+    <div class="brand-name">Ram Kumbhar <span>· Automation Specialist</span></div>
+  </div>
+  <div class="topbar-status"><span class="dot"></span> ALL SCRIPTS RUNNING</div>
+</div>
+
+<section class="hero" style="border-top:none; padding-top:110px;" id="top">
+  <div class="sheet-frame">
+    <div class="sheet-toprow">
+      <div class="name-box">A1</div>
+      <div class="formula-bar"><span class="fx">fx</span><span id="typedFormula"></span><span class="caret"></span></div>
+    </div>
+    <div class="col-headers"><div class="colA">A</div><div class="colB">B — profile.headline</div></div>
+    <div class="hero-row">
+      <div class="row-num">1</div>
+      <div class="hero-cell">
+        <div class="eyebrow">RETURNS(automation_specialist)</div>
+        <h1 class="hero-title">I turn messy<br>spreadsheets into<br><span class="accent">self-running systems.</span></h1>
+        <p class="hero-sub">Ram Kumbhar — Google Sheets &amp; Apps Script specialist at Infosys BPM. I replace copy-paste, manual lookups, and end-of-day reporting with scripts that just run.</p>
+        <div class="hero-actions">
+          <a href="mailto:ramkumbhar.work@gmail.com" class="btn btn-primary">Email me →</a>
+          <a href="https://www.linkedin.com/in/ram-kumbhar" target="_blank" rel="noopener" class="btn btn-linkedin"><span class="li-mark">in</span> Connect on LinkedIn</a>
+          <a href="#roi" class="btn">Try the ROI calculator</a>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><div class="stat-num" id="statTotalExp">—</div><div class="stat-label">TOTAL EXPERIENCE</div></div>
+          <div class="stat"><div class="stat-num">30–60%</div><div class="stat-label">MANUAL EFFORT CUT</div></div>
+          <div class="stat"><div class="stat-num">10,000+</div><div class="stat-label">RECORDS AUTOMATED</div></div>
+          <div class="stat"><div class="stat-num">8</div><div class="stat-label">CERTIFICATIONS</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="section-head reveal"><span class="section-tag">=ABOUT()</span><h2 class="section-title">A quick lookup on who I am</h2></div>
+  <div class="about-grid">
+    <div class="about-copy reveal">
+      <p>I specialize in <strong>automating business processes using Google Sheets and Google Apps Script</strong> — turning slow, manual, error-prone workflows into fast, reliable ones.</p>
+      <p>At <strong>Infosys BPM</strong>, I work on process optimization, data handling, and workflow automation, building scalable solutions that streamline operations, minimize errors, and save real hours in daily processes.</p>
+      <p>I lean on AI tools like ChatGPT to move faster — accelerating script development, debugging, and the design of smarter automations — but the architecture, testing, and judgment calls are mine.</p>
+      <p>Currently looking to grow into roles centered on <strong>Data Analysis, Automation, and Process Improvement.</strong> If you're working on automation, analytics, or tech-driven solutions — let's connect.</p>
+    </div>
+    <div class="range-box reveal">
+      <div class="range-head">NAMED RANGE: current_focus</div>
+      <div class="range-item"><span>ROLE</span><span>Senior Process Executive</span></div>
+      <div class="range-item"><span>COMPANY</span><span>Infosys BPM</span></div>
+      <div class="range-item"><span>LOCATION</span><span>Pune District, MH, India</span></div>
+      <div class="range-item"><span>DEGREE</span><span>BCA, Information Technology</span></div>
+      <div class="range-item"><span>SCHOOL</span><span>KLE Society's College, Khanapur</span></div>
+      <div class="range-item"><span>OPEN TO</span><span>Data / Automation roles</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="experience">
+  <div class="section-head reveal"><span class="section-tag">=SORT(experience, date, DESC)</span><h2 class="section-title">Experience log</h2></div>
+  <div id="experienceContainer"></div>
+</section>
+
+<section id="education">
+  <div class="section-head reveal"><span class="section-tag">=LOOKUP(degree)</span><h2 class="section-title">Academic background</h2></div>
+  <div id="educationContainer"></div>
+</section>
+
+<section id="skills">
+  <div class="section-head reveal"><span class="section-tag">=UNIQUE(skills)</span><h2 class="section-title">Skill range</h2></div>
+  <div class="skills-grid" id="skillsContainer"></div>
+</section>
+
+<section id="certs">
+  <div class="section-head reveal"><span class="section-tag" id="certCount">COUNTA(licenses)</span><h2 class="section-title">Licenses &amp; certifications</h2></div>
+  <p class="section-intro reveal">A running sheet of formal training — full set of eight lives on LinkedIn.</p>
+  <div class="cert-grid" id="certsContainer"></div>
+</section>
+
+<section id="awards">
+  <div class="section-head reveal"><span class="section-tag">=SORT(awards, priority)</span><h2 class="section-title">Awards &amp; recognition</h2></div>
+  <div class="awards-grid" id="awardsContainer"></div>
+</section>
+
+<section id="projects">
+  <div class="section-head reveal"><span class="section-tag">=FILTER(projects, status="shipped")</span><h2 class="section-title">Projects</h2></div>
+  <div class="proj-grid" id="projectsContainer"></div>
+</section>
+
+<section id="roi">
+  <div class="section-head reveal"><span class="section-tag">LIVE FORMULA</span><h2 class="section-title">What is manual work actually costing you?</h2></div>
+  <p class="section-intro reveal">Drag the sliders to match your team's reality. This runs the same napkin math I use before scoping an automation.</p>
+  <div class="roi-shell reveal">
+    <div class="roi-bar"><span class="dot3" style="background:#e2574c"></span><span class="dot3" style="background:#f0a93e"></span><span class="dot3" style="background:#29c17e"></span>&nbsp; roi-calculator.gs — live</div>
+    <div class="roi-body">
+      <div class="roi-inputs">
+        <div class="roi-field"><label>HOURS SPENT ON MANUAL TASK / WEEK <b id="hoursVal">6</b></label><input type="range" id="hoursRange" min="1" max="30" value="6"></div>
+        <div class="roi-field"><label>PEOPLE DOING THIS TASK <b id="peopleVal">1</b></label><input type="range" id="peopleRange" min="1" max="15" value="1"></div>
+        <div class="roi-field"><label>COST PER HOUR (₹) <b id="rateVal">400</b></label><input type="range" id="rateRange" min="100" max="2000" step="50" value="400"></div>
+        <div class="roi-field"><label>AUTOMATION CAN REMOVE <b id="autoVal">70%</b> OF THAT TIME</label><input type="range" id="autoRange" min="20" max="95" value="70"></div>
+      </div>
+      <div class="roi-outputs">
+        <div class="roi-out-row"><div><div class="roi-out-label">HOURS SAVED / YEAR</div><div class="roi-formula" id="hoursFormula"></div></div><div class="roi-out-val" id="hoursSaved">0</div></div>
+        <div class="roi-out-row"><div><div class="roi-out-label">MONEY SAVED / YEAR</div><div class="roi-formula" id="moneyFormula"></div></div><div class="roi-out-val big" id="moneySaved">₹0</div></div>
+        <div class="roi-out-row"><div class="roi-out-label">≈ working weeks handed back</div><div class="roi-out-val" id="weeksBack" style="color:var(--amber);">0</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="section-head reveal"><span class="section-tag">=HYPERLINK()</span><h2 class="section-title">Let's connect</h2></div>
+  <div class="contact-wrap reveal">
+    <div class="contact-title">Got a spreadsheet that runs your team's day but takes hours by hand? <span class="accent">Let's fix that.</span></div>
+    <div class="contact-links">
+      <a class="clink" href="mailto:ramkumbhar.work@gmail.com"><span class="ic">✉</span> ramkumbhar.work@gmail.com</a>
+      <a class="clink" href="tel:+918296291155"><span class="ic">☎</span> +91 82962 91155</a>
+      <a class="clink" style="border-color:#0A66C2; color:#cfe4fb;" href="https://www.linkedin.com/in/ram-kumbhar" target="_blank" rel="noopener"><span class="ic" style="color:#3d92e0;">in</span> Connect on LinkedIn ↗</a>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); max-width:520px;">Opens my LinkedIn profile in a new tab — hit "Connect" or "Follow" there. (LinkedIn doesn't allow sites to do that automatically, so this gets you one tap away instead.)</div>
+  </div>
+</section>
+
+<footer>
+  <div>© 2026 Ram Kumbhar — Sheet1 of ∞</div>
+  <div class="mono">Last edit: just now · Auto-saved to Drive</div>
+</footer>
+
+<div class="tabnav" id="tabnav">
+  <a href="#top" data-target="top"><span class="swatch"></span>Home</a>
+  <a href="#about" data-target="about"><span class="swatch"></span>About</a>
+  <a href="#experience" data-target="experience"><span class="swatch"></span>Experience</a>
+  <a href="#education" data-target="education"><span class="swatch"></span>Education</a>
+  <a href="#skills" data-target="skills"><span class="swatch"></span>Skills</a>
+  <a href="#certs" data-target="certs"><span class="swatch"></span>Certifications</a>
+  <a href="#awards" data-target="awards"><span class="swatch"></span>Awards</a>
+  <a href="#projects" data-target="projects"><span class="swatch"></span>Projects</a>
+  <a href="#roi" data-target="roi"><span class="swatch"></span>ROI Calc</a>
+  <a href="#contact" data-target="contact"><span class="swatch"></span>Contact</a>
+</div>
+
+<!-- Admin FAB -->
+<button id="adminFab" title="Script Editor (admin)">{ }</button>
+
+<!-- Passcode gate -->
+<div class="admin-overlay" id="passOverlay">
+  <div class="passcode-box">
+    <h3 class="display">Script Editor</h3>
+    <p>Enter the admin passcode to edit page content. Change it in the code by searching for <code>ADMIN_PASSCODE</code>.</p>
+    <input type="password" id="passInput" placeholder="Passcode">
+    <div class="passcode-err" id="passErr">Wrong passcode. Try again.</div>
+    <div style="display:flex; gap:8px;">
+      <button class="admin-btn" style="flex:1" id="passCancel">Cancel</button>
+      <button class="admin-btn primary" style="flex:1" id="passSubmit">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin panel -->
+<div class="admin-panel" id="adminPanel">
+  <div class="admin-topbar">
+    <div class="admin-topbar-left">{ } <b>Script Editor</b> — editing live content (this session)</div>
+    <div class="admin-actions">
+      <button class="admin-btn" id="exportBtn">⭳ Export JSON</button>
+      <button class="admin-btn" id="importBtn">⭱ Import JSON</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+      <button class="admin-btn" id="resetBtn">↺ Reset to default</button>
+      <button class="admin-btn primary" id="closeAdminBtn">Close editor</button>
+    </div>
+  </div>
+  <div class="admin-body">
+    <div class="admin-tabs" id="adminTabs">
+      <div class="admin-tab active" data-tab="experience">📄 Experience.gs</div>
+      <div class="admin-tab" data-tab="education">📄 Education.gs</div>
+      <div class="admin-tab" data-tab="skills">📄 Skills.gs</div>
+      <div class="admin-tab" data-tab="certs">📄 Certifications.gs</div>
+      <div class="admin-tab" data-tab="awards">📄 Awards.gs</div>
+      <div class="admin-tab" data-tab="projects">📄 Projects.gs</div>
+    </div>
+    <div class="admin-content" id="adminContent"></div>
+  </div>
+</div>
+
+<script>
+/* ============ ADMIN PASSCODE — change this to whatever you like ============ */
+const ADMIN_PASSCODE = "sheets2026";
+
+/* ============ DATA STORE (drives the whole page) ============ */
+let DATA = {
+  experience: [
+    { company:"Infosys BPM", location:"Pune District, Maharashtra · On-site", role:"Senior Process Executive",
+      start:"2025-07-01", end:null,
+      bullets:[
+        "Automated repetitive business tasks using **Google Apps Script (JavaScript)**, cutting manual effort by **30–60%**.",
+        "Built dynamic **Google Sheets dashboards** for real-time reporting, tracking, and decision-making.",
+        "Streamlined data workflows to improve operational efficiency and reduce processing time.",
+        "Processed and managed large datasets (**10,000+ records**) using advanced formulas, queries, and scripting.",
+        "Identified automation opportunities by collaborating with cross-functional teams.",
+        "Leveraged AI tools like ChatGPT to accelerate script development, debugging, and workflow design."
+      ] },
+    { company:"Infosys BPM", location:"Pune District, Maharashtra · On-site", role:"Process Executive",
+      start:"2024-03-01", end:"2025-07-01",
+      bullets:[
+        "Handled **mortgage underwriting** support work with a focus on accuracy and turnaround time.",
+        "Provided **software troubleshooting** for internal tools and process systems.",
+        "Built early automation habits that carried into the Senior Process Executive role."
+      ] }
+  ],
+  skills: [
+    { name:"Google Apps Script", fn:"CORE()", icon:{type:"logo", key:"googleappsscript", color:"4285F4"}, level:96 },
+    { name:"Google Sheets (Advanced)", fn:"CORE()", icon:{type:"logo", key:"googlesheets", color:"0F9D58"}, level:95 },
+    { name:"SQL for Analysis", fn:"DATA()", icon:{type:"logo", key:"mysql", color:"4479A1"}, level:82 },
+    { name:"JavaScript", fn:"WEB()", icon:{type:"logo", key:"javascript", color:"F7DF1E"}, level:80 },
+    { name:"HTML5", fn:"WEB()", icon:{type:"logo", key:"html5", color:"E34F26"}, level:78 },
+    { name:"CSS", fn:"WEB()", icon:{type:"logo", key:"css", color:"1572B6"}, level:76 },
+    { name:"Microsoft Excel", fn:"TOOL()", icon:{type:"logo", key:"excel", color:"217346"}, level:88 },
+    { name:"Workflow Optimization", fn:"SYSTEM()", icon:{type:"glyph", symbol:"⚙️"}, level:90 },
+    { name:"Problem Solving", fn:"SYSTEM()", icon:{type:"glyph", symbol:"🧩"}, level:93 },
+    { name:"AI-Assisted Development", fn:"AI()", icon:{type:"logo", key:"sparkle", color:"F0A93E"}, level:85 }
+  ],
+  certs: [
+    { name:"T307 — Advanced Excel Course", issuer:"Infosys", date:"2025-07-01", credentialId:"AQV7CZ45XQ", link:"https://www.linkedin.com/in/ram-kumbhar" },
+    { name:"Business Communication Excellence Academy", issuer:"Infosys BPM", date:"2026-04-01", credentialId:"LJZ5YP3HKC", link:"https://www.linkedin.com/in/ram-kumbhar" }
+  ],
+  education: [
+    { degree:"Bachelor of Computer Applications", school:"KLE Society's College of BCA, Khanapur", university:"Rani Channamma University, Belagavi", start:"2020-09-01", end:"2023-11-01", cgpa:"8.57 / 10", honor:"Student of the Year" }
+  ],
+  awards: [
+    { name:"Rising Star", note:"" },
+    { name:"Individual Extra-Miler", note:"×2" },
+    { name:"Spot Award", note:"" },
+    { name:"Award of Excellence", note:"Client recognition" },
+    { name:"iStar Award", note:"" },
+    { name:"Highflyer Award", note:"" }
+  ],
+  projects: [
+    { title:"Student Result & Feedback Analysis", tag:"APPS SCRIPT + SHEETS", desc:"An automated Sheets system for compiling student results and feedback — consolidating raw entries, scoring/aggregating responses, and surfacing summary views for review, without manual sorting." },
+    { title:"", tag:"", desc:"" },
+    { title:"", tag:"", desc:"" }
+  ]
+};
+const DEFAULT_DATA = JSON.parse(JSON.stringify(DATA));
+
+/* ============ date helpers ============ */
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function parseDate(str){ if(!str) return new Date(); const [y,m,d] = str.split('-').map(Number); return new Date(y, (m||1)-1, d||1); }
+function fmtMonthYear(str){ if(!str) return 'PRESENT'; const d = parseDate(str); return MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+function monthsBetween(startStr, endStr){
+  const s = parseDate(startStr), e = endStr ? parseDate(endStr) : new Date();
+  let months = (e.getFullYear()-s.getFullYear())*12 + (e.getMonth()-s.getMonth());
+  if(e.getDate() < s.getDate()) months -= 1;
+  return Math.max(months,0);
+}
+function fmtDuration(totalMonths){
+  const y = Math.floor(totalMonths/12), m = totalMonths%12;
+  const parts = [];
+  if(y>0) parts.push(y + (y===1?' yr':' yrs'));
+  if(m>0 || parts.length===0) parts.push(m + (m===1?' mo':' mos'));
+  return parts.join(' ');
+}
+function mdToStrong(str){ return str.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'); }
+
+/* ============ RENDER: experience (grouped by company, auto tenure) ============ */
+function renderExperience(){
+  const el = document.getElementById('experienceContainer');
+  el.innerHTML = '';
+  if(DATA.experience.length === 0){ el.innerHTML = '<p style="color:var(--muted)">No experience added yet.</p>'; return; }
+
+  const groups = {};
+  DATA.experience.forEach(e => { (groups[e.company] = groups[e.company] || []).push(e); });
+
+  const sortedCompanies = Object.keys(groups).sort((a,b)=>{
+    const latestA = Math.max(...groups[a].map(r=>parseDate(r.start).getTime()));
+    const latestB = Math.max(...groups[b].map(r=>parseDate(r.start).getTime()));
+    return latestB - latestA;
+  });
+
+  sortedCompanies.forEach(company=>{
+    const roles = groups[company].slice().sort((a,b)=>parseDate(b.start)-parseDate(a.start));
+    const minStart = roles.reduce((min,r)=> parseDate(r.start) < min ? parseDate(r.start) : min, parseDate(roles[0].start));
+    const stillOpen = roles.some(r=>!r.end);
+    let totalMonths;
+    if(stillOpen){ totalMonths = monthsBetween(minStart.toISOString().slice(0,10), null); }
+    else {
+      const maxEnd = roles.reduce((max,r)=> parseDate(r.end) > max ? parseDate(r.end) : max, parseDate(roles[0].end));
+      totalMonths = monthsBetween(minStart.toISOString().slice(0,10), maxEnd.toISOString().slice(0,10));
+    }
+
+    const block = document.createElement('div');
+    block.className = 'company-block reveal';
+    block.innerHTML = `
+      <div class="company-head">
+        <div class="company-name">${company}</div>
+        <div class="company-tenure">${fmtDuration(totalMonths)} total</div>
+      </div>
+      <div class="company-meta">${roles[0].location}</div>
+      <div class="roles-wrap"></div>
+    `;
+    const wrap = block.querySelector('.roles-wrap');
+    roles.forEach(r=>{
+      const dur = fmtDuration(monthsBetween(r.start, r.end));
+      const row = document.createElement('div');
+      row.className = 'role-row';
+      row.innerHTML = `
+        <div class="role-period">${fmtMonthYear(r.start)} — ${fmtMonthYear(r.end)}<span class="dur">${dur}</span></div>
+        <div>
+          <h3 class="role-title">${r.role}</h3>
+          <div class="role-loc">${company}</div>
+          <ul class="exp-list">${r.bullets.filter(b=>b.trim()).map(b=>`<li>${mdToStrong(b)}</li>`).join('')}</ul>
+        </div>`;
+      wrap.appendChild(row);
+    });
+    el.appendChild(block);
+  });
+
+  // total experience stat (across all companies combined span)
+  const allStarts = DATA.experience.map(r=>parseDate(r.start).getTime());
+  const anyOpen = DATA.experience.some(r=>!r.end);
+  const earliest = new Date(Math.min(...allStarts));
+  let totalM;
+  if(anyOpen){ totalM = monthsBetween(earliest.toISOString().slice(0,10), null); }
+  else {
+    const allEnds = DATA.experience.map(r=>parseDate(r.end).getTime());
+    const latest = new Date(Math.max(...allEnds));
+    totalM = monthsBetween(earliest.toISOString().slice(0,10), latest.toISOString().slice(0,10));
+  }
+  document.getElementById('statTotalExp').textContent = fmtDuration(totalM);
+
+  attachReveal();
+}
+
+/* ============ Icon library — real brand paths, embedded inline (no network calls, always renders) ============ */
+const ICON_LIB = {
+  googlesheets:{ path:"M11.318 12.545H7.91v-1.909h3.41v1.91zM14.728 0v6h6l-6-6zm1.363 10.636h-3.41v1.91h3.41v-1.91zm0 3.273h-3.41v1.91h3.41v-1.91zM20.727 6.5v15.864c0 .904-.732 1.636-1.636 1.636H4.909a1.636 1.636 0 0 1-1.636-1.636V1.636C3.273.732 4.005 0 4.909 0h9.318v6.5h6.5zm-3.273 2.773H6.545v7.909h10.91v-7.91zm-6.136 4.636H7.91v1.91h3.41v-1.91z" },
+  googleappsscript:{ path:"M12.363 2.54a3.136 3.136 0 0 0-.376.022 2.864 2.864 0 0 0-1.589.828c-.562.58-.82 1.115-.773 1.943-.01.264.193 1.023.272 1.274 1.115 3.546 2.09 6.75 3.26 10.279.08.246.168.486.267.72.02.047.035.046.048-.004.077-.297.174-.612.29-.945.894-2.576 1.772-5.14 2.633-7.696a.345.345 0 0 0 .004-.217 163.054 163.054 0 0 0-1.49-4.572 2.603 2.603 0 0 0-.704-.933c-.55-.46-1.166-.694-1.842-.7Zm9.078.117a2.734 2.734 0 0 0-2.878 1.828l-4.576 13.289a2.734 2.734 0 0 0 1.695 3.475l.12.04a2.734 2.734 0 0 0 3.475-1.694L23.85 6.307a2.734 2.734 0 0 0-1.695-3.476c-.233-.1-.506-.124-.716-.174ZM12.375 3.96a1.396 1.396 0 1 1 0 2.791 1.395 1.395 0 0 1 0-2.79zm8.809.07a1.402 1.402 0 1 1 0 2.803 1.402 1.402 0 0 1 0-2.803zM5.419 7.605a2.853 2.853 0 0 0-.468.052 2.683 2.683 0 0 0-1.337.627 2.62 2.62 0 0 0-.924 1.833 3.808 3.808 0 0 0 0 .648 2.52 2.52 0 0 0 .673 1.52c.221.238.465.454.732.648 3.043 2.21 6.08 4.43 9.108 6.664a.78.78 0 0 0 .158.089c.03-.043.032-.098.007-.167a17.409 17.409 0 0 0-.317-1.066 532.752 532.752 0 0 1-2.02-6.251 41.91 41.91 0 0 0-.497-1.477c-.967-.849-2.078-1.6-3.023-2.302A3.848 3.848 0 0 0 6.153 7.7a2.388 2.388 0 0 0-.734-.094Zm.02 1.424a1.398 1.398 0 1 1 0 2.796 1.398 1.398 0 0 1 0-2.796zm-2.458 6.792c-.733-.006-1.375.202-1.927.622a2.72 2.72 0 0 0-.95 1.45 2.78 2.78 0 0 0-.09 1.04 2.74 2.74 0 0 0 .695 1.583c.664.578 1.26.85 2 .945 1.42-.005 2.84-.012 4.262-.02h.418c2.277-.003 4.513-.002 6.706.003.148.005.28.003.392-.01.06-.005.091-.031.092-.077a10.656 10.656 0 0 0-.834-.653 488.746 488.746 0 0 1-6.57-4.815.236.236 0 0 0-.14-.047c-1.34-.003-2.691-.01-4.054-.02zm-.19 1.418a1.402 1.402 0 1 1 0 2.803 1.402 1.402 0 0 1 0-2.803zm13.874.002a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 0 1 0-2.8z" },
+  mysql:{ path:"M16.405 5.501c-.115 0-.193.014-.274.033v.013h.014c.054.104.146.18.214.273.054.107.1.214.154.32l.014-.015c.094-.066.14-.172.14-.333-.04-.047-.046-.094-.08-.14-.04-.067-.126-.1-.18-.153zM5.77 18.695h-.927a50.854 50.854 0 00-.27-4.41h-.008l-1.41 4.41H2.45l-1.4-4.41h-.01a72.892 72.892 0 00-.195 4.41H0c.055-1.966.192-3.81.41-5.53h1.15l1.335 4.064h.008l1.347-4.064h1.095c.242 2.015.384 3.86.428 5.53zm4.017-4.08c-.378 2.045-.876 3.533-1.492 4.46-.482.716-1.01 1.073-1.583 1.073-.153 0-.34-.046-.566-.138v-.494c.11.017.24.026.386.026.268 0 .483-.075.647-.222.197-.18.295-.382.295-.605 0-.155-.077-.47-.23-.944L6.23 14.615h.91l.727 2.36c.164.536.233.91.205 1.123.4-1.064.678-2.227.835-3.483zm12.325 4.08h-2.63v-5.53h.885v4.85h1.745zm-3.32.135l-1.016-.5c.09-.076.177-.158.255-.25.433-.506.648-1.258.648-2.253 0-1.83-.718-2.746-2.155-2.746-.704 0-1.254.232-1.65.697-.43.508-.646 1.256-.646 2.245 0 .972.19 1.686.574 2.14.35.41.877.615 1.583.615.264 0 .506-.033.725-.098l1.325.772.36-.622zM15.5 17.588c-.225-.36-.337-.94-.337-1.736 0-1.393.424-2.09 1.27-2.09.443 0 .77.167.977.5.224.362.336.936.336 1.723 0 1.404-.424 2.108-1.27 2.108-.445 0-.77-.167-.978-.5zm-1.658-.425c0 .47-.172.856-.516 1.156-.344.3-.803.45-1.384.45-.543 0-1.064-.172-1.573-.515l.237-.476c.438.22.833.328 1.19.328.332 0 .593-.073.783-.22a.754.754 0 00.3-.615c0-.33-.23-.61-.648-.845-.388-.213-1.163-.657-1.163-.657-.422-.307-.632-.636-.632-1.177 0-.45.157-.81.47-1.085.315-.278.72-.415 1.22-.415.512 0 .98.136 1.4.41l-.213.476a2.726 2.726 0 00-1.064-.23c-.283 0-.502.068-.654.206a.685.685 0 00-.248.524c0 .328.234.61.666.85.393.215 1.187.67 1.187.67.433.305.648.63.648 1.168zm9.382-5.852c-.535-.014-.95.04-1.297.188-.1.04-.26.04-.274.167.055.053.063.14.11.214.08.134.218.313.346.407.14.11.28.216.427.31.26.16.555.255.81.416.145.094.293.213.44.313.073.05.12.14.214.172v-.02c-.046-.06-.06-.147-.105-.214-.067-.067-.134-.127-.2-.193a3.223 3.223 0 00-.695-.675c-.214-.146-.682-.35-.77-.595l-.013-.014c.146-.013.32-.066.46-.106.227-.06.435-.047.67-.106.106-.027.213-.06.32-.094v-.06c-.12-.12-.21-.283-.334-.395a8.867 8.867 0 00-1.104-.823c-.21-.134-.476-.22-.697-.334-.08-.04-.214-.06-.26-.127-.12-.146-.19-.34-.275-.514a17.69 17.69 0 01-.547-1.163c-.12-.262-.193-.523-.34-.763-.69-1.137-1.437-1.826-2.586-2.5-.247-.14-.543-.2-.856-.274-.167-.008-.334-.02-.5-.027-.11-.047-.216-.174-.31-.235-.38-.24-1.364-.76-1.644-.072-.18.434.267.862.422 1.082.115.153.26.328.34.5.047.116.06.235.107.356.106.294.207.622.347.897.073.14.153.287.247.413.054.073.146.107.167.227-.094.136-.1.334-.154.5-.24.757-.146 1.693.194 2.25.107.166.362.534.703.393.3-.12.234-.5.32-.835.02-.08.007-.133.048-.187v.015c.094.188.188.367.274.555.206.328.566.668.867.895.16.12.287.328.487.402v-.02h-.015c-.043-.058-.1-.086-.154-.133a3.445 3.445 0 01-.35-.4 8.76 8.76 0 01-.747-1.218c-.11-.21-.202-.436-.29-.643-.04-.08-.04-.2-.107-.24-.1.146-.247.273-.32.453-.127.288-.14.642-.188 1.01-.027.007-.014 0-.027.014-.214-.052-.287-.274-.367-.46-.2-.475-.233-1.238-.06-1.785.047-.14.247-.582.167-.716-.042-.127-.174-.2-.247-.303a2.478 2.478 0 01-.24-.427c-.16-.374-.24-.788-.414-1.162-.08-.173-.22-.354-.334-.513-.127-.18-.267-.307-.368-.52-.033-.073-.08-.194-.027-.274.014-.054.042-.075.094-.09.088-.072.335.022.422.062.247.1.455.194.662.334.094.066.195.193.315.226h.14c.214.047.455.014.655.073.355.114.675.28.962.46a5.953 5.953 0 012.085 2.286c.08.154.115.295.188.455.14.33.313.663.455.982.14.315.275.636.476.897.1.14.502.213.682.286.133.06.34.115.46.188.23.14.454.3.67.454.11.076.443.243.463.378z" },
+  javascript:{ path:"M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034l-.705.089c-.676.165-1.32.525-1.71 1.005-1.14 1.291-.811 3.541.569 4.471 1.365 1.02 3.361 1.244 3.616 2.205.24 1.17-.87 1.545-1.966 1.41-.811-.18-1.26-.586-1.755-1.336l-1.83 1.051c.21.48.45.689.81 1.109 1.74 1.756 6.09 1.666 6.871-1.004.029-.09.24-.705.074-1.65l.046.067zm-8.983-7.245h-2.248c0 1.938-.009 3.864-.009 5.805 0 1.232.063 2.363-.138 2.711-.33.689-1.18.601-1.566.48-.396-.196-.597-.466-.83-.855-.063-.105-.11-.196-.127-.196l-1.825 1.125c.305.63.75 1.172 1.324 1.517.855.51 2.004.675 3.207.405.783-.226 1.458-.691 1.811-1.411.51-.93.402-2.07.397-3.346.012-2.054 0-4.109 0-6.179l.004-.056z" },
+  html5:{ path:"M1.5 0h21l-1.91 21.563L11.977 24l-8.564-2.438L1.5 0zm7.031 9.75l-.232-2.718 10.059.003.23-2.622L5.412 4.41l.698 8.01h9.126l-.326 3.426-2.91.804-2.955-.81-.188-2.11H6.248l.33 4.171L12 19.351l5.379-1.443.744-8.157H8.531z" },
+  css:{ path:"M0 0v20.16A3.84 3.84 0 0 0 3.84 24h16.32A3.84 3.84 0 0 0 24 20.16V3.84A3.84 3.84 0 0 0 20.16 0Zm14.256 13.08c1.56 0 2.28 1.08 2.304 2.64h-1.608c.024-.288-.048-.6-.144-.84-.096-.192-.288-.264-.552-.264-.456 0-.696.264-.696.84-.024.576.288.888.768 1.08.72.288 1.608.744 1.92 1.296q.432.648.432 1.656c0 1.608-.912 2.592-2.496 2.592-1.656 0-2.4-1.032-2.424-2.688h1.68c0 .792.264 1.176.792 1.176.264 0 .456-.072.552-.24.192-.312.24-1.176-.048-1.512-.312-.408-.912-.6-1.32-.816q-.828-.396-1.224-.936c-.24-.36-.36-.888-.36-1.536 0-1.44.936-2.472 2.424-2.448m5.4 0c1.584 0 2.304 1.08 2.328 2.64h-1.608c0-.288-.048-.6-.168-.84-.096-.192-.264-.264-.528-.264-.48 0-.72.264-.72.84s.288.888.792 1.08c.696.288 1.608.744 1.92 1.296.264.432.408.984.408 1.656.024 1.608-.888 2.592-2.472 2.592-1.68 0-2.424-1.056-2.448-2.688h1.68c0 .744.264 1.176.792 1.176.264 0 .456-.072.552-.24.216-.312.264-1.176-.048-1.512-.288-.408-.888-.6-1.32-.816-.552-.264-.96-.576-1.2-.936s-.36-.888-.36-1.536c-.024-1.44.912-2.472 2.4-2.448m-11.031.018c.711-.006 1.419.198 1.839.63.432.432.672 1.128.648 1.992H9.336c.024-.456-.096-.792-.432-.96-.312-.144-.768-.048-.888.24-.12.264-.192.576-.168.864v3.504c0 .744.264 1.128.768 1.128a.65.65 0 0 0 .552-.264c.168-.24.192-.552.168-.84h1.776c.096 1.632-.984 2.712-2.568 2.688-1.536 0-2.496-.864-2.472-2.472v-4.032c0-.816.24-1.44.696-1.848.432-.408 1.146-.624 1.857-.63" }
+};
+/* Excel and a generic "AI" mark are built as simple custom glyphs rather than official trademarked logos, */
+/* since those two icons were withdrawn from the public icon library we source from. */
+const CUSTOM_ICON_SVG = {
+  excel: (color)=>`<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="${color}"/><path d="M7 7l10 10M17 7L7 17" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>`,
+  sparkle: (color)=>`<svg viewBox="0 0 24 24"><path fill="${color}" d="M12 1.5l2.1 6.4 6.4 2.1-6.4 2.1L12 18.5l-2.1-6.4-6.4-2.1 6.4-2.1z"/></svg>`
+};
+function iconMarkup(key, color){
+  if(CUSTOM_ICON_SVG[key]) return CUSTOM_ICON_SVG[key](color);
+  const def = ICON_LIB[key];
+  if(!def) return null;
+  return `<svg viewBox="0 0 24 24"><path fill="${color||'#29c17e'}" d="${def.path}"/></svg>`;
+}
+
+/* ============ RENDER: skills (with real embedded logos) ============ */
+function initials(name){ return name.split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function renderSkills(){
+  const el = document.getElementById('skillsContainer');
+  el.innerHTML = '';
+  DATA.skills.forEach(s=>{
+    const cell = document.createElement('div');
+    cell.className = 'cell skill-cell reveal';
+
+    const logoNode = document.createElement('div');
+    if(s.icon.type === 'logo'){
+      const svg = iconMarkup(s.icon.key, s.icon.color);
+      if(svg){ logoNode.className = 'skill-logo'; logoNode.innerHTML = svg; }
+      else { logoNode.className = 'skill-logo glyph'; logoNode.style.color = '#29c17e'; logoNode.textContent = initials(s.name); }
+    } else {
+      logoNode.className = 'skill-logo glyph';
+      logoNode.textContent = s.icon.symbol || initials(s.name);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'skill-body';
+    body.innerHTML = `<div class="skill-fn">${s.fn||''}</div><div class="skill-name">${s.name}</div><div class="skill-bar"><i data-w="${s.level}"></i></div>`;
+
+    cell.appendChild(logoNode);
+    cell.appendChild(body);
+    el.appendChild(cell);
+  });
+  attachReveal();
+  attachSkillBars();
+}
+
+/* ============ RENDER: certs ============ */
+function renderCerts(){
+  const el = document.getElementById('certsContainer');
+  el.innerHTML = '';
+  DATA.certs.forEach(c=>{
+    const cell = document.createElement('div');
+    cell.className = 'cell cert-cell reveal';
+    cell.innerHTML = `
+      <div class="cert-top"><div class="cert-issuer">${(c.issuer||'').toUpperCase()}</div><div class="cert-icon">📄</div></div>
+      <div class="cert-name">${c.name}</div>
+      <div class="cert-meta">ISSUED ${fmtMonthYear(c.date)} · ID ${c.credentialId||'—'}</div>
+      <a class="cert-link" href="${c.link||'#'}" target="_blank" rel="noopener">Show credential ↗</a>`;
+    el.appendChild(cell);
+  });
+  const more = document.createElement('div');
+  more.className = 'cell cert-cell cert-more reveal';
+  const remaining = Math.max(8 - DATA.certs.length, 0);
+  more.innerHTML = `<div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:22px; color:var(--muted); margin-bottom:8px;">+${remaining}</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:14px;">more certifications on record</div>
+      <a class="cert-link" href="https://www.linkedin.com/in/ram-kumbhar" target="_blank" rel="noopener">View all 8 on LinkedIn ↗</a>
+    </div>`;
+  el.appendChild(more);
+  document.getElementById('certCount').textContent = `COUNTA(licenses) = 8`;
+  attachReveal();
+}
+
+/* ============ RENDER: projects ============ */
+function renderProjects(){
+  const el = document.getElementById('projectsContainer');
+  el.innerHTML = '';
+  DATA.projects.forEach(p=>{
+    const cell = document.createElement('div');
+    if(!p.title && !p.desc){
+      cell.className = 'cell proj-cell empty reveal';
+      cell.innerHTML = `<div class="plus">+</div><div>Case study<br>coming soon</div>`;
+    } else {
+      cell.className = 'cell proj-cell reveal';
+      cell.innerHTML = `${p.tag?`<div class="proj-tag">${p.tag}</div>`:''}<h3 class="proj-title">${p.title}</h3><p class="proj-desc">${p.desc||''}</p>`;
+    }
+    el.appendChild(cell);
+  });
+  attachReveal();
+}
+
+/* ============ RENDER: education ============ */
+function renderEducation(){
+  const el = document.getElementById('educationContainer');
+  el.innerHTML = '';
+  if(DATA.education.length === 0){ el.innerHTML = '<p style="color:var(--muted)">No education added yet.</p>'; return; }
+  DATA.education.forEach(ed=>{
+    const startYear = ed.start ? parseDate(ed.start).getFullYear() : '';
+    const endYear = ed.end ? parseDate(ed.end).getFullYear() : 'Present';
+    const card = document.createElement('div');
+    card.className = 'edu-card reveal';
+    card.innerHTML = `
+      <div class="edu-years">${startYear} — ${endYear}</div>
+      <h3 class="edu-degree">${ed.degree}</h3>
+      <div class="edu-school">${ed.school}</div>
+      ${ed.university ? `<div class="edu-uni">Affiliated to ${ed.university}</div>` : ''}
+      <div class="edu-badges">
+        ${ed.honor ? `<span class="edu-badge">★ ${ed.honor}</span>` : ''}
+        ${ed.cgpa ? `<span class="edu-badge alt">CGPA ${ed.cgpa}</span>` : ''}
+      </div>`;
+    el.appendChild(card);
+  });
+  attachReveal();
+}
+
+/* ============ RENDER: awards ============ */
+function renderAwards(){
+  const el = document.getElementById('awardsContainer');
+  el.innerHTML = '';
+  if(DATA.awards.length === 0){ el.innerHTML = '<p style="color:var(--muted)">No awards added yet.</p>'; return; }
+  DATA.awards.forEach(a=>{
+    const cell = document.createElement('div');
+    cell.className = 'cell award-cell reveal';
+    cell.innerHTML = `
+      <div class="award-star">★</div>
+      <div><div class="award-name">${a.name}</div>${a.note ? `<div class="award-note">${a.note}</div>` : ''}</div>`;
+    el.appendChild(cell);
+  });
+  attachReveal();
+}
+
+function renderAll(){ renderExperience(); renderEducation(); renderSkills(); renderCerts(); renderAwards(); renderProjects(); if(document.getElementById('adminPanel').classList.contains('open')) renderAdminTab(currentAdminTab); }
+
+/* ============ typed formula ============ */
+const formulaText = '=CONCAT("Ram Kumbhar", " — Google Sheets & Apps Script Automation Specialist")';
+const typedEl = document.getElementById('typedFormula');
+let ti = 0;
+function typeFormula(){
+  if(ti <= formulaText.length){ typedEl.textContent = formulaText.slice(0, ti); ti++; setTimeout(typeFormula, 26); }
+  else { setTimeout(()=>{ ti = 0; typeFormula(); }, 3400); }
+}
+typeFormula();
+
+/* ============ cell cursor ============ */
+const cursor = document.getElementById('cellCursor');
+let refPool = ['B4','C7','D2','A9','F3','E5','G1','H6','C12','D8'];
+function bindHoverCursor(){
+  document.querySelectorAll('.cell, .btn, .clink, .tabnav a').forEach((elx)=>{
+    if(elx.dataset.cursorBound) return;
+    elx.dataset.cursorBound = '1';
+    elx.addEventListener('mouseenter', ()=>{
+      const r = elx.getBoundingClientRect();
+      cursor.style.width = r.width + 'px'; cursor.style.height = r.height + 'px';
+      cursor.style.transform = `translate(${r.left}px, ${r.top}px)`;
+      cursor.dataset.ref = refPool[Math.floor(Math.random()*refPool.length)];
+      cursor.style.opacity = 1;
+    });
+    elx.addEventListener('mouseleave', ()=>{ cursor.style.opacity = 0; });
+  });
+}
+window.addEventListener('scroll', ()=>{ cursor.style.opacity = 0; }, {passive:true});
+
+/* ============ scroll reveal ============ */
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+}, {threshold:0.12});
+function attachReveal(){ document.querySelectorAll('.reveal:not(.in)').forEach(el=>io.observe(el)); bindHoverCursor(); }
+
+const barIo = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ e.target.style.width = e.target.dataset.w + '%'; barIo.unobserve(e.target); } });
+}, {threshold:0.4});
+function attachSkillBars(){ document.querySelectorAll('.skill-bar i').forEach(b=>barIo.observe(b)); }
+
+/* ============ active tab tracking ============ */
+function updateActiveTab(){
+  const sections = ['top','about','experience','education','skills','certs','awards','projects','roi','contact'].map(id=>document.getElementById(id));
+  const tabs = document.querySelectorAll('.tabnav a');
+  let current = sections[0].id;
+  const y = window.scrollY + window.innerHeight * 0.35;
+  sections.forEach(sec=>{ if(sec.offsetTop <= y) current = sec.id; });
+  tabs.forEach(t=>t.classList.toggle('active', t.dataset.target === current));
+}
+window.addEventListener('scroll', updateActiveTab, {passive:true});
+
+/* ============ ROI calculator ============ */
+const hoursRange = document.getElementById('hoursRange'), peopleRange = document.getElementById('peopleRange');
+const rateRange = document.getElementById('rateRange'), autoRange = document.getElementById('autoRange');
+const hoursVal = document.getElementById('hoursVal'), peopleVal = document.getElementById('peopleVal');
+const rateVal = document.getElementById('rateVal'), autoVal = document.getElementById('autoVal');
+const hoursSaved = document.getElementById('hoursSaved'), moneySaved = document.getElementById('moneySaved');
+const weeksBack = document.getElementById('weeksBack'), hoursFormula = document.getElementById('hoursFormula'), moneyFormula = document.getElementById('moneyFormula');
+function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function calc(){
+  const h = +hoursRange.value, p = +peopleRange.value, r = +rateRange.value, a = +autoRange.value;
+  hoursVal.textContent = h; peopleVal.textContent = p; rateVal.textContent = r; autoVal.textContent = a + '%';
+  const weeklyHoursSaved = h * p * (a/100);
+  const annualHoursSaved = weeklyHoursSaved * 52;
+  const annualMoneySaved = annualHoursSaved * r;
+  hoursSaved.textContent = Math.round(annualHoursSaved).toLocaleString('en-IN');
+  moneySaved.textContent = fmtINR(annualMoneySaved);
+  weeksBack.textContent = (annualHoursSaved/40).toFixed(1) + ' work-weeks';
+  hoursFormula.textContent = `=${h}×${p}×${a}%×52`;
+  moneyFormula.textContent = `=hours_saved×${r}`;
+}
+[hoursRange, peopleRange, rateRange, autoRange].forEach(el=>el.addEventListener('input', calc));
+
+/* =========================================================================
+   ADMIN PANEL
+   ========================================================================= */
+const adminFab = document.getElementById('adminFab');
+const passOverlay = document.getElementById('passOverlay');
+const passInput = document.getElementById('passInput');
+const passErr = document.getElementById('passErr');
+const adminPanel = document.getElementById('adminPanel');
+let currentAdminTab = 'experience';
+let unlocked = false;
+
+adminFab.addEventListener('click', ()=>{
+  if(unlocked){ openAdmin(); } else { passOverlay.classList.add('open'); passInput.value=''; passErr.style.display='none'; passInput.focus(); }
+});
+document.getElementById('passCancel').addEventListener('click', ()=> passOverlay.classList.remove('open'));
+document.getElementById('passSubmit').addEventListener('click', tryUnlock);
+passInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') tryUnlock(); });
+function tryUnlock(){
+  if(passInput.value === ADMIN_PASSCODE){ unlocked = true; passOverlay.classList.remove('open'); openAdmin(); }
+  else { passErr.style.display = 'block'; }
+}
+function openAdmin(){ adminPanel.classList.add('open'); renderAdminTab(currentAdminTab); }
+document.getElementById('closeAdminBtn').addEventListener('click', ()=> adminPanel.classList.remove('open'));
+
+document.querySelectorAll('.admin-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    currentAdminTab = tab.dataset.tab;
+    renderAdminTab(currentAdminTab);
+  });
+});
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'portfolio-data.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{ const parsed = JSON.parse(ev.target.result); DATA = parsed; renderAll(); alert('Content imported for this session.'); }
+    catch(err){ alert('Could not read that file — make sure it is a JSON export from this site.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Reset all content back to the original defaults?')){ DATA = JSON.parse(JSON.stringify(DEFAULT_DATA)); renderAll(); }
+});
+
+function renderAdminTab(tab){
+  const content = document.getElementById('adminContent');
+  content.innerHTML = '';
+  if(tab === 'experience') renderAdminExperience(content);
+  if(tab === 'education') renderAdminEducation(content);
+  if(tab === 'skills') renderAdminSkills(content);
+  if(tab === 'certs') renderAdminCerts(content);
+  if(tab === 'awards') renderAdminAwards(content);
+  if(tab === 'projects') renderAdminProjects(content);
+}
+
+/* ---- generic list item builder ---- */
+function listItem(titleHtml, subHtml, onEdit, onDelete){
+  const div = document.createElement('div');
+  div.className = 'admin-list-item';
+  div.innerHTML = `<div class="info"><b>${titleHtml}</b><span>${subHtml}</span></div>
+    <div class="admin-item-actions"><button class="icon-btn edit">✎</button><button class="icon-btn del">🗑</button></div>`;
+  div.querySelector('.edit').addEventListener('click', onEdit);
+  div.querySelector('.del').addEventListener('click', onDelete);
+  return div;
+}
+
+/* ---- EXPERIENCE admin ---- */
+function renderAdminExperience(content){
+  DATA.experience.forEach((r, idx)=>{
+    content.appendChild(listItem(
+      `${r.role} — ${r.company}`,
+      `${fmtMonthYear(r.start)} – ${fmtMonthYear(r.end)}`,
+      ()=> showExperienceForm(content, idx),
+      ()=>{ if(confirm('Delete this role?')){ DATA.experience.splice(idx,1); renderAll(); } }
+    ));
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-new-btn'; addBtn.textContent = '+ Add role / position';
+  addBtn.addEventListener('click', ()=> showExperienceForm(content, null));
+  content.appendChild(addBtn);
+}
+function showExperienceForm(content, idx){
+  const isEdit = idx !== null;
+  const data = isEdit ? DATA.experience[idx] : {company:'Infosys BPM', location:'', role:'', start:'', end:'', bullets:['']};
+  const form = document.createElement('div');
+  form.className = 'admin-form';
+  form.innerHTML = `
+    <div class="form-row">
+      <div class="form-field"><label>COMPANY</label><input id="f_company" value="${data.company||''}"></div>
+      <div class="form-field"><label>ROLE TITLE</label><input id="f_role" value="${data.role||''}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>LOCATION / TYPE</label><input id="f_location" value="${data.location||''}"></div>
+      <div class="form-field"><label>START MONTH</label><input type="month" id="f_start" value="${(data.start||'').slice(0,7)}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>END MONTH (leave blank if current)</label><input type="month" id="f_end" value="${(data.end||'').slice(0,7)}"></div>
+      <div></div>
+    </div>
+    <div class="form-row single">
+      <div class="form-field"><label>ACHIEVEMENTS (one per line, wrap **word** to bold)</label><textarea id="f_bullets">${(data.bullets||[]).join('\\n')}</textarea></div>
+    </div>
+    <div class="form-buttons">
+      <button class="admin-btn primary" id="f_save">Save</button>
+      <button class="admin-btn" id="f_cancel">Cancel</button>
+    </div>`;
+  content.insertBefore(form, content.firstChild);
+  form.querySelector('#f_cancel').addEventListener('click', ()=> renderAdminTab('experience'));
+  form.querySelector('#f_save').addEventListener('click', ()=>{
+    const newEntry = {
+      company: form.querySelector('#f_company').value.trim() || 'Untitled Company',
+      role: form.querySelector('#f_role').value.trim() || 'Untitled Role',
+      location: form.querySelector('#f_location').value.trim(),
+      start: form.querySelector('#f_start').value ? form.querySelector('#f_start').value + '-01' : new Date().toISOString().slice(0,10),
+      end: form.querySelector('#f_end').value ? form.querySelector('#f_end').value + '-01' : null,
+      bullets: form.querySelector('#f_bullets').value.split('\\n').filter(b=>b.trim())
+    };
+    if(isEdit) DATA.experience[idx] = newEntry; else DATA.experience.push(newEntry);
+    renderAll();
+  });
+}
+
+/* ---- SKILLS admin ---- */
+function renderAdminSkills(content){
+  DATA.skills.forEach((s, idx)=>{
+    content.appendChild(listItem(
+      s.name, `${s.fn||''} · ${s.level}% · icon: ${s.icon.type==='logo'?s.icon.key:s.icon.symbol}`,
+      ()=> showSkillForm(content, idx),
+      ()=>{ if(confirm('Delete this skill?')){ DATA.skills.splice(idx,1); renderAll(); } }
+    ));
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-new-btn'; addBtn.textContent = '+ Add skill';
+  addBtn.addEventListener('click', ()=> showSkillForm(content, null));
+  content.appendChild(addBtn);
+}
+const BUILTIN_LOGOS = [
+  {key:'googlesheets', label:'Google Sheets', color:'0F9D58'},
+  {key:'googleappsscript', label:'Google Apps Script', color:'4285F4'},
+  {key:'mysql', label:'MySQL / SQL', color:'4479A1'},
+  {key:'javascript', label:'JavaScript', color:'F7DF1E'},
+  {key:'html5', label:'HTML5', color:'E34F26'},
+  {key:'css', label:'CSS', color:'1572B6'},
+  {key:'excel', label:'Microsoft Excel (custom mark)', color:'217346'},
+  {key:'sparkle', label:'AI / Sparkle (custom mark)', color:'F0A93E'}
+];
+function showSkillForm(content, idx){
+  const isEdit = idx !== null;
+  const data = isEdit ? DATA.skills[idx] : {name:'', fn:'', icon:{type:'logo', key:'googlesheets', color:'0F9D58'}, level:80};
+  const form = document.createElement('div');
+  form.className = 'admin-form';
+  const logoOptions = BUILTIN_LOGOS.map(l=>`<option value="${l.key}" data-color="${l.color}" ${data.icon.key===l.key?'selected':''}>${l.label}</option>`).join('');
+  form.innerHTML = `
+    <div class="form-row">
+      <div class="form-field"><label>SKILL NAME</label><input id="f_name" value="${data.name}"></div>
+      <div class="form-field"><label>CATEGORY LABEL (e.g. CORE(), DATA())</label><input id="f_fn" value="${data.fn||''}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>ICON TYPE</label>
+        <select id="f_icontype"><option value="logo" ${data.icon.type==='logo'?'selected':''}>Built-in logo</option><option value="glyph" ${data.icon.type==='glyph'?'selected':''}>Emoji / symbol</option></select>
+      </div>
+      <div class="form-field"><label>PROFICIENCY %</label><input type="number" min="0" max="100" id="f_level" value="${data.level}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field" id="f_logo_wrap"><label>LOGO</label><select id="f_logo">${logoOptions}</select></div>
+      <div class="form-field" id="f_emoji_wrap" style="display:none"><label>EMOJI / SYMBOL</label><input id="f_emoji" value="${data.icon.symbol||''}" placeholder="e.g. ⚙️"></div>
+    </div>
+    <div class="form-hint">Logos are built into the page (no external image loading, so they always show up — including offline).</div>
+    <div class="form-buttons">
+      <button class="admin-btn primary" id="f_save">Save</button>
+      <button class="admin-btn" id="f_cancel">Cancel</button>
+    </div>`;
+  content.insertBefore(form, content.firstChild);
+  const typeSel = form.querySelector('#f_icontype');
+  function syncTypeUI(){
+    const isLogo = typeSel.value === 'logo';
+    form.querySelector('#f_logo_wrap').style.display = isLogo ? '' : 'none';
+    form.querySelector('#f_emoji_wrap').style.display = isLogo ? 'none' : '';
+  }
+  typeSel.addEventListener('change', syncTypeUI); syncTypeUI();
+  if(data.icon.type === 'glyph') typeSel.value = 'glyph', syncTypeUI();
+  form.querySelector('#f_cancel').addEventListener('click', ()=> renderAdminTab('skills'));
+  form.querySelector('#f_save').addEventListener('click', ()=>{
+    const type = typeSel.value;
+    let icon;
+    if(type === 'logo'){
+      const sel = form.querySelector('#f_logo');
+      const opt = sel.options[sel.selectedIndex];
+      icon = {type:'logo', key: sel.value, color: opt.dataset.color};
+    } else {
+      icon = {type:'glyph', symbol: form.querySelector('#f_emoji').value.trim() || '⚡'};
+    }
+    const newEntry = { name: form.querySelector('#f_name').value.trim() || 'Untitled skill', fn: form.querySelector('#f_fn').value.trim(), icon, level: Math.min(100, Math.max(0, +form.querySelector('#f_level').value || 0)) };
+    if(isEdit) DATA.skills[idx] = newEntry; else DATA.skills.push(newEntry);
+    renderAll();
+  });
+}
+
+/* ---- CERTS admin ---- */
+function renderAdminCerts(content){
+  DATA.certs.forEach((c, idx)=>{
+    content.appendChild(listItem(
+      c.name, `${c.issuer} · ${fmtMonthYear(c.date)}`,
+      ()=> showCertForm(content, idx),
+      ()=>{ if(confirm('Delete this certification?')){ DATA.certs.splice(idx,1); renderAll(); } }
+    ));
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-new-btn'; addBtn.textContent = '+ Add certification';
+  addBtn.addEventListener('click', ()=> showCertForm(content, null));
+  content.appendChild(addBtn);
+}
+function showCertForm(content, idx){
+  const isEdit = idx !== null;
+  const data = isEdit ? DATA.certs[idx] : {name:'', issuer:'', date:'', credentialId:'', link:''};
+  const form = document.createElement('div');
+  form.className = 'admin-form';
+  form.innerHTML = `
+    <div class="form-row single"><div class="form-field"><label>CERTIFICATION NAME</label><input id="f_name" value="${data.name}"></div></div>
+    <div class="form-row">
+      <div class="form-field"><label>ISSUER</label><input id="f_issuer" value="${data.issuer}"></div>
+      <div class="form-field"><label>ISSUE MONTH</label><input type="month" id="f_date" value="${(data.date||'').slice(0,7)}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>CREDENTIAL ID</label><input id="f_cred" value="${data.credentialId||''}"></div>
+      <div class="form-field"><label>CREDENTIAL LINK</label><input id="f_link" value="${data.link||''}"></div>
+    </div>
+    <div class="form-buttons">
+      <button class="admin-btn primary" id="f_save">Save</button>
+      <button class="admin-btn" id="f_cancel">Cancel</button>
+    </div>`;
+  content.insertBefore(form, content.firstChild);
+  form.querySelector('#f_cancel').addEventListener('click', ()=> renderAdminTab('certs'));
+  form.querySelector('#f_save').addEventListener('click', ()=>{
+    const newEntry = { name: form.querySelector('#f_name').value.trim()||'Untitled certification', issuer: form.querySelector('#f_issuer').value.trim(), date: form.querySelector('#f_date').value ? form.querySelector('#f_date').value+'-01' : '', credentialId: form.querySelector('#f_cred').value.trim(), link: form.querySelector('#f_link').value.trim() };
+    if(isEdit) DATA.certs[idx] = newEntry; else DATA.certs.push(newEntry);
+    renderAll();
+  });
+}
+
+/* ---- EDUCATION admin ---- */
+function renderAdminEducation(content){
+  DATA.education.forEach((ed, idx)=>{
+    content.appendChild(listItem(
+      ed.degree, `${ed.school} · ${ed.university||''}`,
+      ()=> showEducationForm(content, idx),
+      ()=>{ if(confirm('Delete this education entry?')){ DATA.education.splice(idx,1); renderAll(); } }
+    ));
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-new-btn'; addBtn.textContent = '+ Add education';
+  addBtn.addEventListener('click', ()=> showEducationForm(content, null));
+  content.appendChild(addBtn);
+}
+function showEducationForm(content, idx){
+  const isEdit = idx !== null;
+  const data = isEdit ? DATA.education[idx] : {degree:'', school:'', university:'', start:'', end:'', cgpa:'', honor:''};
+  const form = document.createElement('div');
+  form.className = 'admin-form';
+  form.innerHTML = `
+    <div class="form-row single"><div class="form-field"><label>DEGREE</label><input id="f_degree" value="${data.degree}"></div></div>
+    <div class="form-row">
+      <div class="form-field"><label>SCHOOL / COLLEGE</label><input id="f_school" value="${data.school}"></div>
+      <div class="form-field"><label>AFFILIATED UNIVERSITY (optional)</label><input id="f_uni" value="${data.university||''}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>START MONTH</label><input type="month" id="f_start" value="${(data.start||'').slice(0,7)}"></div>
+      <div class="form-field"><label>END MONTH (leave blank if ongoing)</label><input type="month" id="f_end" value="${(data.end||'').slice(0,7)}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>HONOR / AWARD (optional)</label><input id="f_honor" value="${data.honor||''}" placeholder="e.g. Student of the Year"></div>
+      <div class="form-field"><label>CGPA / GRADE (optional)</label><input id="f_cgpa" value="${data.cgpa||''}" placeholder="e.g. 8.57 / 10"></div>
+    </div>
+    <div class="form-buttons">
+      <button class="admin-btn primary" id="f_save">Save</button>
+      <button class="admin-btn" id="f_cancel">Cancel</button>
+    </div>`;
+  content.insertBefore(form, content.firstChild);
+  form.querySelector('#f_cancel').addEventListener('click', ()=> renderAdminTab('education'));
+  form.querySelector('#f_save').addEventListener('click', ()=>{
+    const newEntry = {
+      degree: form.querySelector('#f_degree').value.trim() || 'Untitled degree',
+      school: form.querySelector('#f_school').value.trim(),
+      university: form.querySelector('#f_uni').value.trim(),
+      start: form.querySelector('#f_start').value ? form.querySelector('#f_start').value+'-01' : '',
+      end: form.querySelector('#f_end').value ? form.querySelector('#f_end').value+'-01' : '',
+      honor: form.querySelector('#f_honor').value.trim(),
+      cgpa: form.querySelector('#f_cgpa').value.trim()
+    };
+    if(isEdit) DATA.education[idx] = newEntry; else DATA.education.push(newEntry);
+    renderAll();
+  });
+}
+
+/* ---- AWARDS admin ---- */
+function renderAdminAwards(content){
+  DATA.awards.forEach((a, idx)=>{
+    content.appendChild(listItem(
+      a.name, a.note || '—',
+      ()=> showAwardForm(content, idx),
+      ()=>{ if(confirm('Delete this award?')){ DATA.awards.splice(idx,1); renderAll(); } }
+    ));
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-new-btn'; addBtn.textContent = '+ Add award';
+  addBtn.addEventListener('click', ()=> showAwardForm(content, null));
+  content.appendChild(addBtn);
+}
+function showAwardForm(content, idx){
+  const isEdit = idx !== null;
+  const data = isEdit ? DATA.awards[idx] : {name:'', note:''};
+  const form = document.createElement('div');
+  form.className = 'admin-form';
+  form.innerHTML = `
+    <div class="form-row">
+      <div class="form-field"><label>AWARD NAME</label><input id="f_name" value="${data.name}"></div>
+      <div class="form-field"><label>NOTE (optional, e.g. ×2, Client recognition)</label><input id="f_note" value="${data.note||''}"></div>
+    </div>
+    <div class="form-buttons">
+      <button class="admin-btn primary" id="f_save">Save</button>
+      <button class="admin-btn" id="f_cancel">Cancel</button>
+    </div>`;
+  content.insertBefore(form, content.firstChild);
+  form.querySelector('#f_cancel').addEventListener('click', ()=> renderAdminTab('awards'));
+  form.querySelector('#f_save').addEventListener('click', ()=>{
+    const newEntry = { name: form.querySelector('#f_name').value.trim() || 'Untitled award', note: form.querySelector('#f_note').value.trim() };
+    if(isEdit) DATA.awards[idx] = newEntry; else DATA.awards.push(newEntry);
+    renderAll();
+  });
+}
+
+/* ---- PROJECTS admin ---- */
+function renderAdminProjects(content){
+  DATA.projects.forEach((p, idx)=>{
+    content.appendChild(listItem(
+      p.title || '(empty slot — shows as "coming soon")', p.tag || '—',
+      ()=> showProjectForm(content, idx),
+      ()=>{ if(confirm('Delete this project?')){ DATA.projects.splice(idx,1); renderAll(); } }
+    ));
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-new-btn'; addBtn.textContent = '+ Add project';
+  addBtn.addEventListener('click', ()=> showProjectForm(content, null));
+  content.appendChild(addBtn);
+}
+function showProjectForm(content, idx){
+  const isEdit = idx !== null;
+  const data = isEdit ? DATA.projects[idx] : {title:'', tag:'', desc:''};
+  const form = document.createElement('div');
+  form.className = 'admin-form';
+  form.innerHTML = `
+    <div class="form-row">
+      <div class="form-field"><label>PROJECT TITLE (leave blank for a "coming soon" slot)</label><input id="f_title" value="${data.title}"></div>
+      <div class="form-field"><label>TAG (e.g. APPS SCRIPT + SHEETS)</label><input id="f_tag" value="${data.tag||''}"></div>
+    </div>
+    <div class="form-row single"><div class="form-field"><label>DESCRIPTION</label><textarea id="f_desc">${data.desc||''}</textarea></div></div>
+    <div class="form-buttons">
+      <button class="admin-btn primary" id="f_save">Save</button>
+      <button class="admin-btn" id="f_cancel">Cancel</button>
+    </div>`;
+  content.insertBefore(form, content.firstChild);
+  form.querySelector('#f_cancel').addEventListener('click', ()=> renderAdminTab('projects'));
+  form.querySelector('#f_save').addEventListener('click', ()=>{
+    const newEntry = { title: form.querySelector('#f_title').value.trim(), tag: form.querySelector('#f_tag').value.trim(), desc: form.querySelector('#f_desc').value.trim() };
+    if(isEdit) DATA.projects[idx] = newEntry; else DATA.projects.push(newEntry);
+    renderAll();
+  });
+}
+
+/* ============ init ============ */
+renderAll();
+updateActiveTab();
+calc();
+</script>
+</body>
+</html>
