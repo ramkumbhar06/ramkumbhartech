@@ -8,13 +8,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#15130f; --ink-soft:#1c1911; --ink-softer:#231f15;
+    --ink:#0b0b0a; --ink-soft:#131312; --ink-softer:#1a1a18;
     --paper:#f2e8d3; --paper-dim:#cdbe9c;
     --ledger:#f2e8d3; --ledger-line:#c9b98d;
     --line:rgba(242,232,211,0.09); --line-strong:rgba(242,232,211,0.17);
     --green:#5a9c74; --green-dim:#3c6e50; --green-glow:rgba(90,156,116,0.35);
     --amber:#e0a53d; --select:#3f6ea3; --muted:#9c9078; --danger:#b3453f;
-    --stamp:#b3453f; --perf-dot:rgba(242,232,211,0.35); --topbar-bg:rgba(21,19,15,0.82);
+    --stamp:#b3453f; --perf-dot:rgba(242,232,211,0.35); --topbar-bg:rgba(11,11,10,0.85);
   }
   body.light-mode{
     --ink:#f2e8d3; --ink-soft:#e8d9b3; --ink-softer:#ddc999;
@@ -119,8 +119,8 @@
   .section-tag{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--green); background:rgba(41,193,126,0.1); border:1px solid var(--green-dim); padding:4px 10px; border-radius:3px;}
   .section-title{font-family:'Fraunces',serif; font-size:clamp(1.7rem,3.4vw,2.6rem); font-weight:600; margin:0; letter-spacing:-0.01em;}
   .section-intro{color:var(--muted); max-width:640px; margin:0 0 52px; font-size:1rem; line-height:1.6;}
-  .reveal{opacity:0; clip-path:inset(0 0 100% 0); transform:translateY(14px); transition:opacity .7s ease, clip-path .8s cubic-bezier(.16,.84,.44,1), transform .8s cubic-bezier(.16,.84,.44,1);}
-  .reveal.in{opacity:1; clip-path:inset(0 0 0% 0); transform:translateY(0);}
+  .reveal{opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s cubic-bezier(.16,.84,.44,1);}
+  .reveal.in{opacity:1; transform:translateY(0);}
 
   .cell{position:relative; background:var(--ink-soft); border:1px solid var(--line); border-radius:3px; padding:22px; transition:border-color .2s ease, transform .2s ease;}
   .cell:hover{border-color:var(--line-strong); transform:translateY(-3px);}
@@ -226,6 +226,13 @@
   .contact-title{font-size:clamp(1.9rem,4.4vw,3.4rem); font-family:'Fraunces',serif; font-weight:600; letter-spacing:-0.02em; max-width:780px; line-height:1.12;}
   .contact-title .accent{color:var(--green);}
   .contact-links{display:flex; flex-wrap:wrap; gap:14px;}
+  .ha-zone{position:relative; width:270px; max-width:100%; height:56px; display:flex; align-items:center;}
+  .happy-automating{position:relative; display:inline-flex; align-items:center; gap:8px; font-family:'JetBrains Mono',monospace; font-size:12.5px;
+    color:var(--amber); cursor:default; transition:transform .16s ease-out, color .2s ease; will-change:transform;}
+  .happy-automating .ha-arrow{display:inline-block; opacity:0.7; transition:transform .2s ease, opacity .2s ease;}
+  .happy-automating.caught{color:var(--green); transform:scale(1.08) !important;}
+  .happy-automating.caught .ha-arrow{opacity:1; transform:translateX(4px);}
+  @media (hover:none){ .happy-automating{transform:none !important;} }
   .clink{display:flex; align-items:center; gap:10px; padding:14px 20px; border:1px solid var(--line-strong); border-radius:3px; color:var(--paper); text-decoration:none; font-family:'JetBrains Mono',monospace; font-size:13px; transition:all .18s ease;}
   .clink:hover{border-color:var(--green); color:var(--green); transform:translateY(-2px);}
   .clink .ic{color:var(--amber);}
@@ -384,7 +391,9 @@
       <a class="clink" href="tel:+918296291155"><span class="ic">☎</span> +91 82962 91155</a>
       <a class="clink clink-linkedin" href="https://www.linkedin.com/in/ram-kumbhar" target="_blank" rel="noopener"><span class="ic">in</span> Connect on LinkedIn ↗</a>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); max-width:520px;">Happy Automating!</div>
+    <div class="ha-zone" id="haZone">
+      <div class="happy-automating" id="haBtn"><span>Happy Automating</span> <span class="ha-arrow">→</span></div>
+    </div>
   </div>
 </section>
 
@@ -892,6 +901,47 @@ function bindMagnetic(){
   });
 }
 bindMagnetic();
+
+/* ============ evasive "Happy Automating" badge — dodges the cursor, can be cornered ============ */
+(function initEvasiveBadge(){
+  const zone = document.getElementById('haZone');
+  const btn = document.getElementById('haBtn');
+  if(!zone || !btn || touchDevice) return;
+  const RADIUS = 100;
+  let raf = null, tx = 0, ty = 0;
+
+  function clampToZone(){
+    const zr = zone.getBoundingClientRect(), br = btn.getBoundingClientRect();
+    const maxX = Math.max(0, (zr.width - br.width)/2 + 6);
+    const maxY = Math.max(0, (zr.height - br.height)/2 + 4);
+    tx = Math.max(-maxX, Math.min(maxX, tx));
+    ty = Math.max(-maxY, Math.min(maxY, ty));
+  }
+
+  function onMove(e){
+    if(raf) return;
+    raf = requestAnimationFrame(()=>{
+      raf = null;
+      const r = btn.getBoundingClientRect();
+      const cx = r.left + r.width/2, cy = r.top + r.height/2;
+      const dx = cx - e.clientX, dy = cy - e.clientY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < RADIUS && dist > 0.01){
+        const factor = (RADIUS - dist)/RADIUS;
+        tx += (dx/dist) * factor * 14;
+        ty += (dy/dist) * factor * 8;
+        clampToZone();
+        btn.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px)`;
+        btn.classList.toggle('caught', dist < 22);
+      } else if(dist >= RADIUS){
+        tx *= 0.9; ty *= 0.9;
+        btn.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px)`;
+        btn.classList.remove('caught');
+      }
+    });
+  }
+  window.addEventListener('mousemove', onMove, {passive:true});
+})();
 
 /* ============ scroll reveal ============ */
 const io = new IntersectionObserver((entries)=>{
